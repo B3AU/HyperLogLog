@@ -305,6 +305,47 @@ HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
     
 }
 
+/* merge with registers of another HyperLogLog*/
+static PyObject *
+HyperLogLog_merge_registers(HyperLogLog *self, PyObject *args)
+{
+    PyByteArrayObject *regs;
+
+    if (!PyArg_ParseTuple(args, "O", &regs))
+        return NULL;
+
+    char* registers;
+    registers = PyByteArray_AsString((PyObject*) regs);
+    
+    int i;
+    /*unrolled version is ~80% faster. Further unrolling makes it slower (tested on Intel E5-1650) */
+    for (i = 0; i < self->size; i+=4) {
+        //if (registers[i]){/*extra lazy check is ~10% faster when you have many zeros*/
+        if  (self->registers[i] < registers[i]){
+             self->registers[i] = registers[i];
+        }
+        
+        //if (registers[i+1]){
+        if (self->registers[i+1] < registers[i+1]){
+            self->registers[i+1] = registers[i+1];
+        }
+        
+        //if (registers[i+2]){
+        if (self->registers[i+2] < registers[i+2]){
+            self->registers[i+2] = registers[i+2];
+        }
+        
+        //if (registers[i+3]){
+        if (self->registers[i+3] < registers[i+3]){
+            self->registers[i+3] = registers[i+3];
+        }
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+    
+}
+
 /* Support for pickling, called when HyperLogLog is de-serialized. */
 static PyObject *
 HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
@@ -343,6 +384,9 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"merge", (PyCFunction)HyperLogLog_merge, METH_VARARGS,
      "Merge another HyperLogLog object with the current HyperLogLog."
+    },
+    {"merge_registers", (PyCFunction)HyperLogLog_merge_registers, METH_VARARGS,
+     "Merge the registers of another HyperLogLog object with the current HyperLogLog."
     },
     {"murmur3_hash", (PyCFunction)HyperLogLog_murmur3_hash, METH_VARARGS,
      "Gets a Murmur3 hash"
